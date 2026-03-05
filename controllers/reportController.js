@@ -7,7 +7,11 @@ const {
   AlignmentType,
   PageBreak,
   UnderlineType,
-  Footer
+  Footer,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
 } = require("docx");
 
 const { ChartJSNodeCanvas } = require("chartjs-node-canvas");
@@ -16,7 +20,7 @@ const fs = require("fs");
 
 const chartCanvas = new ChartJSNodeCanvas({
   width: 800,
-  height: 500
+  height: 500,
 });
 
 exports.generateReport = async (req, res) => {
@@ -24,39 +28,40 @@ exports.generateReport = async (req, res) => {
     const d = req.body;
     const photos = req.files || [];
 
-    // ================= COMMON FORMAT =================
-
-    // HEADINGS → SIZE 14 (28), BOLD, UNDERLINE, CAPS, SPACING ADDED
+    // ===== HELPER FUNCTIONS =====
     const heading = (text) =>
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 200, after: 400 }, // space after heading
+        spacing: { line: 360 }, // 1.5 line spacing
         children: [
           new TextRun({
             text: text.toUpperCase(),
             font: "Times New Roman",
             size: 28,
             bold: true,
-            underline: { type: UnderlineType.SINGLE }
-          })
-        ]
+            underline: { type: UnderlineType.SINGLE },
+          }),
+        ],
       });
 
-    // NORMAL TEXT → SIZE 14, SPACING ADDED
-    const normalText = (text) =>
+    const normalText = (text, center = false) =>
       new Paragraph({
-        alignment: AlignmentType.LEFT,
-        spacing: { before: 100, after: 200 },
+        alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT,
+        spacing: { line: 360 }, // 1.5 line spacing
         children: [
           new TextRun({
-            text,
+            text: String(text),
             font: "Times New Roman",
-            size: 28
-          })
-        ]
+            size: 24,
+          }),
+        ],
       });
 
-    const blank = () => new Paragraph({ text: "" });
+    const blank = () =>
+      new Paragraph({
+        text: "",
+        spacing: { line: 360 }, // 1.5 line spacing for blank lines
+      });
 
     const children = [];
 
@@ -67,149 +72,257 @@ exports.generateReport = async (req, res) => {
     children.push(heading(`Date: ${d.reportDateShort}`));
     children.push(blank());
 
-    children.push(normalText(
-      `The Department of Public Health Dentistry, ${d.collegeName}, Madurai in association with ${d.associationName} and with ${d.projectName} conducted a dental treatment camp at ${d.campLocation} on ${d.reportDateLong}.`
-    ));
+    children.push(
+      normalText(
+        `Department of Public Health Dentistry, ${d.collegeName}, Madurai in association with ${d.associationName} and with ${d.projectName} conducted a dental screening and treatment camp at ${d.campLocation} on ${d.reportDateLong}.`
+      )
+    );
 
-    children.push(normalText(
-      `The Camp started at ${d.startTime} and concluded at ${d.endTime}. A team of dentists including ${d.staffCount} staff, ${d.postgraduateCount} postgraduate and ${d.internCount} interns rendered oral health care for the public.`
-    ));
+    children.push(
+      normalText(
+        `Dr R. Palanivel Pandian organised this program. The Camp started at ${d.startTime} and ended at ${d.endTime}. A team of dentists including ${d.staffCount} staff member, ${d.postgraduateCount} postgraduate and ${d.internCount} interns provided oral health care to the people.`
+      )
+    );
 
-    children.push(normalText(
-      `A total of ${d.totalPatients} people attended the dental camp and ${d.treatmentCount} people were treated. Oral cavity examination was done with oral health talk and oral hygiene instructions.`
-    ));
+    children.push(
+      normalText(
+        `A total of ${d.totalPatients} people attended the dental camp and ${d.treatmentCount} people were treated along with oral health education and oral hygiene instructions.`
+      )
+    );
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 2 (PHOTOS) =================
+    // ================= PAGE 2 PHOTOS =================
     children.push(heading("Photos"));
-    children.push(blank());
 
     for (let photo of photos) {
       const img = fs.readFileSync(photo.path);
       children.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 200 },
           children: [
             new ImageRun({
               data: img,
-              transformation: { width: 400, height: 250 }
-            })
-          ]
+              transformation: { width: 400, height: 250 },
+            }),
+          ],
+          spacing: { line: 360 },
         })
       );
     }
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 3 (CAMP STATISTICS) =================
+    // ================= PAGE 3 CAMP STATISTICS =================
+    const campDataRows = [
+      ["Male", d.maleCount],
+      ["Female", d.femaleCount],
+    ];
+
+    const campTable = new Table({
+      alignment: AlignmentType.CENTER,
+      width: { size: 60, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [normalText("Gender", true)] }),
+            new TableCell({ children: [normalText("No of Patients", true)] }),
+          ],
+        }),
+        ...campDataRows.map(
+          (row) =>
+            new TableRow({
+              children: row.map(
+                (val) =>
+                  new TableCell({
+                    children: [normalText(val, true)],
+                    verticalAlign: "center",
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  })
+              ),
+            })
+        ),
+      ],
+    });
+
     const campChart = await chartCanvas.renderToBuffer({
       type: "bar",
       data: {
         labels: ["Male", "Female"],
-        datasets: [{
-          data: [parseInt(d.maleCount), parseInt(d.femaleCount)],
-          backgroundColor: "blue"
-        }]
+        datasets: [
+          {
+            label: "No of Patients",
+            data: [parseInt(d.maleCount), parseInt(d.femaleCount)],
+            backgroundColor: "lightblue",
+          },
+        ],
       },
-      options: { plugins: { legend: { display: false } } }
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Gender" } },
+          y: { title: { display: true, text: "No of Patients" } },
+        },
+      },
     });
 
     children.push(heading("Camp Statistics"));
-    children.push(normalText(`Total Number of Patients    ${d.totalPatients}`));
-    children.push(normalText(`Male    ${d.maleCount}`));
-    children.push(normalText(`Female    ${d.femaleCount}`));
+    children.push(campTable);
     children.push(blank());
-
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 400, after: 200 }, // space before graph
         children: [
           new ImageRun({
             data: campChart,
-            transformation: { width: 500, height: 300 }
-          })
-        ]
+            transformation: { width: 500, height: 300 },
+          }),
+        ],
+        spacing: { line: 360 },
       })
     );
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 4 (SCREENING STATISTICS) =================
+    // ================= PAGE 4 SCREENING STATISTICS =================
+    const screeningDataRows = [
+      ["Dental Caries", d.dentalCaries],
+      ["Root Stump", d.rootStump],
+      ["Gingivitis", d.gingivitis],
+      ["Periodontitis", d.periodontitis],
+      ["Missing", d.missing],
+      ["Consultation", d.consultation],
+      ["Others", d.others],
+    ];
+
+    const screeningTable = new Table({
+      alignment: AlignmentType.CENTER,
+      width: { size: 70, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [normalText("Diagnosis", true)] }),
+            new TableCell({ children: [normalText("No of Patients", true)] }),
+          ],
+        }),
+        ...screeningDataRows.map(
+          (row) =>
+            new TableRow({
+              children: row.map(
+                (val) =>
+                  new TableCell({
+                    children: [normalText(val, true)],
+                    verticalAlign: "center",
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  })
+              ),
+            })
+        ),
+      ],
+    });
+
     const screeningChart = await chartCanvas.renderToBuffer({
       type: "bar",
       data: {
-        labels: ["Dental Caries","Root Stump","Gingivitis","Periodontitis","Missing","Consultation","Others"],
-        datasets: [{
-          data: [
-            d.dentalCaries,
-            d.rootStump,
-            d.gingivitis,
-            d.periodontitis,
-            d.missing,
-            d.consultation,
-            d.others
-          ],
-          backgroundColor: "blue"
-        }]
+        labels: screeningDataRows.map((r) => r[0]),
+        datasets: [
+          {
+            label: "No of Patients",
+            data: screeningDataRows.map((r) => r[1]),
+            backgroundColor: "lightblue",
+          },
+        ],
       },
-      options: { plugins: { legend: { display: false } } }
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Diagnosis" } },
+          y: { title: { display: true, text: "No of Patients" } },
+        },
+      },
     });
 
     children.push(heading("Screening Statistics"));
-    children.push(normalText(`Dental Caries    ${d.dentalCaries}`));
-    children.push(normalText(`Root Stump    ${d.rootStump}`));
-    children.push(normalText(`Gingivitis    ${d.gingivitis}`));
-    children.push(normalText(`Periodontitis    ${d.periodontitis}`));
-    children.push(normalText(`Missing    ${d.missing}`));
-    children.push(normalText(`Consultation    ${d.consultation}`));
-    children.push(normalText(`Others    ${d.others}`));
+    children.push(screeningTable);
     children.push(blank());
-
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 400, after: 200 },
         children: [
           new ImageRun({
             data: screeningChart,
-            transformation: { width: 500, height: 300 }
-          })
-        ]
+            transformation: { width: 500, height: 300 },
+          }),
+        ],
+        spacing: { line: 360 },
       })
     );
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 5 (TREATMENT STATISTICS) =================
+    // ================= PAGE 5 TREATMENT =================
+    const treatmentDataRows = [["Scaling", d.scaling]];
+
+    const treatmentTable = new Table({
+      alignment: AlignmentType.CENTER,
+      width: { size: 60, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({ children: [normalText("Treatment", true)] }),
+            new TableCell({ children: [normalText("No of Patients", true)] }),
+          ],
+        }),
+        ...treatmentDataRows.map(
+          (row) =>
+            new TableRow({
+              children: row.map(
+                (val) =>
+                  new TableCell({
+                    children: [normalText(val, true)],
+                    verticalAlign: "center",
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  })
+              ),
+            })
+        ),
+      ],
+    });
+
     const treatmentChart = await chartCanvas.renderToBuffer({
       type: "bar",
       data: {
         labels: ["Scaling"],
-        datasets: [{
-          data: [d.scaling],
-          backgroundColor: "blue"
-        }]
+        datasets: [
+          {
+            label: "No of Patients",
+            data: [d.scaling],
+            backgroundColor: "lightblue",
+          },
+        ],
       },
-      options: { plugins: { legend: { display: false } } }
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Treatment" } },
+          y: { title: { display: true, text: "No of Patients" } },
+        },
+      },
     });
 
     children.push(heading("Treatment Statistics"));
-    children.push(normalText(`Scaling    ${d.scaling}`));
+    children.push(treatmentTable);
     children.push(blank());
-
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 400, after: 200 },
         children: [
           new ImageRun({
             data: treatmentChart,
-            transformation: { width: 500, height: 300 }
-          })
-        ]
+            transformation: { width: 500, height: 300 },
+          }),
+        ],
+        spacing: { line: 360 },
       })
     );
 
@@ -218,17 +331,18 @@ exports.generateReport = async (req, res) => {
       children: [
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { before: 200 },
+          spacing: { line: 360 },
           children: [
             new TextRun({
-              text: "HEAD OF THE DEPARTMENT          PRINCIPAL",
+              text:
+                "HEAD OF THE DEPARTMENT                                      PRINCIPAL",
               font: "Times New Roman",
               size: 28,
-              bold: true
-            })
-          ]
-        })
-      ]
+              bold: true,
+            }),
+          ],
+        }),
+      ],
     });
 
     // ================= CREATE DOCUMENT =================
@@ -236,16 +350,18 @@ exports.generateReport = async (req, res) => {
       sections: [
         {
           footers: { default: footer },
-          children
-        }
-      ]
+          children,
+        },
+      ],
     });
 
     const buffer = await Packer.toBuffer(doc);
 
-    res.setHeader("Content-Disposition", "attachment; filename=Camp_Report.docx");
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=Camp_Report.docx"
+    );
     res.send(buffer);
-
   } catch (err) {
     console.log(err);
     res.status(500).send("Error generating report");
