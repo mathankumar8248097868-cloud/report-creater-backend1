@@ -29,11 +29,10 @@ exports.generateReport = async (req, res) => {
     const photos = req.files || [];
 
     // ===== HELPER FUNCTIONS =====
-
     const heading = (text) =>
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { line: 360 },
+        spacing: { line: 360 }, // 1.5 line spacing
         children: [
           new TextRun({
             text: text.toUpperCase(),
@@ -48,7 +47,7 @@ exports.generateReport = async (req, res) => {
     const normalText = (text, center = false) =>
       new Paragraph({
         alignment: center ? AlignmentType.CENTER : AlignmentType.LEFT,
-        spacing: { line: 360 },
+        spacing: { line: 360 }, // 1.5 line spacing
         children: [
           new TextRun({
             text: String(text),
@@ -61,13 +60,12 @@ exports.generateReport = async (req, res) => {
     const blank = () =>
       new Paragraph({
         text: "",
-        spacing: { line: 360 },
+        spacing: { line: 360 }, // 1.5 line spacing for blank lines
       });
 
     const children = [];
 
     // ================= PAGE 1 =================
-
     children.push(heading(d.collegeName));
     children.push(heading(d.departmentName));
     children.push(heading(`Camp Report – ${d.campLocation}`));
@@ -94,62 +92,28 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PHOTOS =================
-
+    // ================= PAGE 2 PHOTOS =================
     children.push(heading("Photos"));
-    children.push(blank());
 
-    for (let i = 0; i < photos.length; i += 4) {
-      const row1 = [];
-      const row2 = [];
-
-      for (let j = i; j < i + 2 && j < photos.length; j++) {
-        const img = fs.readFileSync(photos[j].path);
-
-        row1.push(
-          new ImageRun({
-            data: img,
-            transformation: { width: 300, height: 200 },
-          })
-        );
-      }
-
-      for (let j = i + 2; j < i + 4 && j < photos.length; j++) {
-        const img = fs.readFileSync(photos[j].path);
-
-        row2.push(
-          new ImageRun({
-            data: img,
-            transformation: { width: 300, height: 200 },
-          })
-        );
-      }
-
-      if (row1.length > 0) {
-        children.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 300 },
-            children: row1,
-          })
-        );
-      }
-
-      if (row2.length > 0) {
-        children.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 300 },
-            children: row2,
-          })
-        );
-      }
-
-      children.push(new Paragraph({ children: [new PageBreak()] }));
+    for (let photo of photos) {
+      const img = fs.readFileSync(photo.path);
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [
+            new ImageRun({
+              data: img,
+              transformation: { width: 400, height: 250 },
+            }),
+          ],
+          spacing: { line: 360 },
+        })
+      );
     }
 
-    // ================= CAMP STATISTICS =================
+    children.push(new Paragraph({ children: [new PageBreak()] }));
 
+    // ================= PAGE 3 CAMP STATISTICS =================
     const campDataRows = [
       ["Male", d.maleCount],
       ["Female", d.femaleCount],
@@ -172,6 +136,8 @@ exports.generateReport = async (req, res) => {
                 (val) =>
                   new TableCell({
                     children: [normalText(val, true)],
+                    verticalAlign: "center",
+                    width: { size: 50, type: WidthType.PERCENTAGE },
                   })
               ),
             })
@@ -191,13 +157,18 @@ exports.generateReport = async (req, res) => {
           },
         ],
       },
-      options: { plugins: { legend: { display: false } } },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Gender" } },
+          y: { title: { display: true, text: "No of Patients" } },
+        },
+      },
     });
 
     children.push(heading("Camp Statistics"));
     children.push(campTable);
     children.push(blank());
-
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -207,13 +178,13 @@ exports.generateReport = async (req, res) => {
             transformation: { width: 500, height: 300 },
           }),
         ],
+        spacing: { line: 360 },
       })
     );
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= SCREENING STATISTICS =================
-
+    // ================= PAGE 4 SCREENING STATISTICS =================
     const screeningDataRows = [
       ["Dental Caries", d.dentalCaries],
       ["Root Stump", d.rootStump],
@@ -241,6 +212,8 @@ exports.generateReport = async (req, res) => {
                 (val) =>
                   new TableCell({
                     children: [normalText(val, true)],
+                    verticalAlign: "center",
+                    width: { size: 50, type: WidthType.PERCENTAGE },
                   })
               ),
             })
@@ -260,13 +233,18 @@ exports.generateReport = async (req, res) => {
           },
         ],
       },
-      options: { plugins: { legend: { display: false } } },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Diagnosis" } },
+          y: { title: { display: true, text: "No of Patients" } },
+        },
+      },
     });
 
     children.push(heading("Screening Statistics"));
     children.push(screeningTable);
     children.push(blank());
-
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -276,13 +254,13 @@ exports.generateReport = async (req, res) => {
             transformation: { width: 500, height: 300 },
           }),
         ],
+        spacing: { line: 360 },
       })
     );
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= TREATMENT STATISTICS =================
-
+    // ================= PAGE 5 TREATMENT =================
     const treatmentDataRows = [["Scaling", d.scaling]];
 
     const treatmentTable = new Table({
@@ -302,6 +280,8 @@ exports.generateReport = async (req, res) => {
                 (val) =>
                   new TableCell({
                     children: [normalText(val, true)],
+                    verticalAlign: "center",
+                    width: { size: 50, type: WidthType.PERCENTAGE },
                   })
               ),
             })
@@ -321,13 +301,18 @@ exports.generateReport = async (req, res) => {
           },
         ],
       },
-      options: { plugins: { legend: { display: false } } },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: "Treatment" } },
+          y: { title: { display: true, text: "No of Patients" } },
+        },
+      },
     });
 
     children.push(heading("Treatment Statistics"));
     children.push(treatmentTable);
     children.push(blank());
-
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
@@ -337,11 +322,11 @@ exports.generateReport = async (req, res) => {
             transformation: { width: 500, height: 300 },
           }),
         ],
+        spacing: { line: 360 },
       })
     );
 
     // ================= FOOTER =================
-
     const footer = new Footer({
       children: [
         new Paragraph({
@@ -360,8 +345,7 @@ exports.generateReport = async (req, res) => {
       ],
     });
 
-    // ================= DOC CREATION =================
-
+    // ================= CREATE DOCUMENT =================
     const doc = new Document({
       sections: [
         {
@@ -377,7 +361,6 @@ exports.generateReport = async (req, res) => {
       "Content-Disposition",
       "attachment; filename=Camp_Report.docx"
     );
-
     res.send(buffer);
   } catch (err) {
     console.log(err);
