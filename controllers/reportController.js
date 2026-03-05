@@ -94,60 +94,61 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 2 PHOTOS =================
+    // ================= PHOTOS =================
 
     children.push(heading("Photos"));
+    children.push(blank());
 
-    const photoRows = [];
+    for (let i = 0; i < photos.length; i += 4) {
+      const row1 = [];
+      const row2 = [];
 
-    for (let i = 0; i < photos.length; i += 2) {
-      const rowImages = [];
+      for (let j = i; j < i + 2 && j < photos.length; j++) {
+        const img = fs.readFileSync(photos[j].path);
 
-      for (let j = i; j < i + 2; j++) {
-        if (photos[j]) {
-          const img = fs.readFileSync(photos[j].path);
-
-          rowImages.push(
-            new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [
-                    new ImageRun({
-                      data: img,
-                      transformation: {
-                        width: 300,
-                        height: 200,
-                      },
-                    }),
-                  ],
-                }),
-              ],
-            })
-          );
-        } else {
-          rowImages.push(
-            new TableCell({
-              children: [new Paragraph("")],
-            })
-          );
-        }
+        row1.push(
+          new ImageRun({
+            data: img,
+            transformation: { width: 300, height: 200 },
+          })
+        );
       }
 
-      photoRows.push(new TableRow({ children: rowImages }));
+      for (let j = i + 2; j < i + 4 && j < photos.length; j++) {
+        const img = fs.readFileSync(photos[j].path);
+
+        row2.push(
+          new ImageRun({
+            data: img,
+            transformation: { width: 300, height: 200 },
+          })
+        );
+      }
+
+      if (row1.length > 0) {
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 },
+            children: row1,
+          })
+        );
+      }
+
+      if (row2.length > 0) {
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 300 },
+            children: row2,
+          })
+        );
+      }
+
+      children.push(new Paragraph({ children: [new PageBreak()] }));
     }
 
-    const photoTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: photoRows,
-    });
-
-    children.push(photoTable);
-
-    children.push(new Paragraph({ children: [new PageBreak()] }));
-
-    // ================= PAGE 3 CAMP STATISTICS =================
+    // ================= CAMP STATISTICS =================
 
     const campDataRows = [
       ["Male", d.maleCount],
@@ -190,9 +191,7 @@ exports.generateReport = async (req, res) => {
           },
         ],
       },
-      options: {
-        plugins: { legend: { display: false } },
-      },
+      options: { plugins: { legend: { display: false } } },
     });
 
     children.push(heading("Camp Statistics"));
@@ -213,7 +212,7 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 4 SCREENING STATISTICS =================
+    // ================= SCREENING STATISTICS =================
 
     const screeningDataRows = [
       ["Dental Caries", d.dentalCaries],
@@ -261,9 +260,7 @@ exports.generateReport = async (req, res) => {
           },
         ],
       },
-      options: {
-        plugins: { legend: { display: false } },
-      },
+      options: { plugins: { legend: { display: false } } },
     });
 
     children.push(heading("Screening Statistics"));
@@ -284,7 +281,7 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-    // ================= PAGE 5 TREATMENT =================
+    // ================= TREATMENT STATISTICS =================
 
     const treatmentDataRows = [["Scaling", d.scaling]];
 
@@ -324,9 +321,7 @@ exports.generateReport = async (req, res) => {
           },
         ],
       },
-      options: {
-        plugins: { legend: { display: false } },
-      },
+      options: { plugins: { legend: { display: false } } },
     });
 
     children.push(heading("Treatment Statistics"));
@@ -365,7 +360,7 @@ exports.generateReport = async (req, res) => {
       ],
     });
 
-    // ================= CREATE DOC =================
+    // ================= DOC CREATION =================
 
     const doc = new Document({
       sections: [
