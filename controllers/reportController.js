@@ -27,7 +27,6 @@ const chartCanvas = new ChartJSNodeCanvas({
 
 exports.generateReport = async (req, res) => {
   try {
-
     const d = req.body;
     const photos = req.files || [];
     const children = [];
@@ -66,9 +65,7 @@ exports.generateReport = async (req, res) => {
         spacing: { line: 480 },
       });
 
-
     // ================= PAGE 1 =================
-
     children.push(heading(d.collegeName));
     children.push(heading(d.departmentName));
     children.push(heading(`Camp Report – ${d.campLocation}`));
@@ -95,13 +92,10 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-
     // ================= PAGE 2 PHOTOS =================
-
     children.push(heading("Photos"));
 
     for (let i = 0; i < photos.length; i += 2) {
-
       const img1 = photos[i] ? fs.readFileSync(photos[i].path) : null;
       const img2 = photos[i + 1] ? fs.readFileSync(photos[i + 1].path) : null;
 
@@ -115,16 +109,13 @@ exports.generateReport = async (req, res) => {
           ],
           spacing: { line: 360 },
           children: [
-
             img1
               ? new ImageRun({
                   data: img1,
                   transformation: { width: 250, height: 170 },
                 })
               : new TextRun(""),
-
             new TextRun({ text: "\t" }),
-
             img2
               ? new ImageRun({
                   data: img2,
@@ -140,9 +131,7 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-
     // ================= PAGE 3 CAMP STATISTICS =================
-
     const campTable = new Table({
       alignment: AlignmentType.CENTER,
       width: { size: 60, type: WidthType.PERCENTAGE },
@@ -183,16 +172,10 @@ exports.generateReport = async (req, res) => {
         plugins: { legend: { display: false } },
         scales: {
           x: {
-            title: {
-              display: true,
-              text: "Gender",
-            },
+            title: { display: true, text: "Gender" },
           },
           y: {
-            title: {
-              display: true,
-              text: "No of Patients",
-            },
+            title: { display: true, text: "No of Patients" },
           },
         },
       },
@@ -206,27 +189,25 @@ exports.generateReport = async (req, res) => {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new ImageRun({
-            data: campChart,
-            transformation: { width: 500, height: 300 },
-          }),
+          new ImageRun({ data: campChart, transformation: { width: 500, height: 300 } }),
         ],
       })
     );
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
-
     // ================= PAGE 4 SCREENING STATISTICS =================
-    const screeningDataRows = [
+    let screeningDataRows = [
       ["Dental Caries", d.dentalCaries],
-      ["Root Stump", d.rootStump],
       ["Gingivitis", d.gingivitis],
-      ["Periodontitis", d.periodontitis],
       ["Missing", d.missing],
-      ["Consultation", d.consultation],
-      ["Others", d.others],
+      
     ];
+
+    if (d.extraScreening) {
+      const extra = JSON.parse(d.extraScreening);
+      extra.forEach((item) => screeningDataRows.push([item.name, item.value]));
+    }
 
     const screeningTable = new Table({
       alignment: AlignmentType.CENTER,
@@ -282,10 +263,7 @@ exports.generateReport = async (req, res) => {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new ImageRun({
-            data: screeningChart,
-            transformation: { width: 500, height: 300 },
-          }),
+          new ImageRun({ data: screeningChart, transformation: { width: 500, height: 300 } }),
         ],
         spacing: { line: 360 },
       })
@@ -293,7 +271,13 @@ exports.generateReport = async (req, res) => {
 
     children.push(new Paragraph({ children: [new PageBreak()] }));
 
- // ================= PAGE 5 TREATMENT =================
+    // ================= PAGE 5 TREATMENT =================
+    let treatmentRows = [["Scaling", d.scaling || 0]];
+
+    if (d.extraTreatment) {
+      const extraT = JSON.parse(d.extraTreatment);
+      extraT.forEach((item) => treatmentRows.push([item.name, item.value]));
+    }
 
     const treatmentTable = new Table({
       alignment: AlignmentType.CENTER,
@@ -305,22 +289,21 @@ exports.generateReport = async (req, res) => {
             new TableCell({ children: [normalText("No of Patients", true)] }),
           ],
         }),
-        new TableRow({
-          children: [
-            new TableCell({ children: [normalText("Scaling", true)] }),
-            new TableCell({ children: [normalText(d.scaling || 0, true)] }),
-          ],
-        }),
+        ...treatmentRows.map((row) =>
+          new TableRow({
+            children: row.map((val) => new TableCell({ children: [normalText(val, true)] })),
+          })
+        ),
       ],
     });
 
     const treatmentChart = await chartCanvas.renderToBuffer({
       type: "bar",
       data: {
-        labels: ["Scaling"],
+        labels: treatmentRows.map((r) => r[0]),
         datasets: [
           {
-            data: [parseInt(d.scaling || 0)],
+            data: treatmentRows.map((r) => r[1]),
             backgroundColor: "lightblue",
           },
         ],
@@ -328,18 +311,8 @@ exports.generateReport = async (req, res) => {
       options: {
         plugins: { legend: { display: false } },
         scales: {
-          x: {
-            title: {
-              display: true,
-              text: "Treatment",
-            },
-          },
-          y: {
-            title: {
-              display: true,
-              text: "No of Patients",
-            },
-          },
+          x: { title: { display: true, text: "Treatment" } },
+          y: { title: { display: true, text: "No of Patients" } },
         },
       },
     });
@@ -352,22 +325,19 @@ exports.generateReport = async (req, res) => {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [
-          new ImageRun({
-            data: treatmentChart,
-            transformation: { width: 500, height: 300 },
-          }),
+          new ImageRun({ data: treatmentChart, transformation: { width: 500, height: 300 } }),
         ],
       })
     );
 
+    // ================= FOOTER =================
     const footer = new Footer({
       children: [
         new Paragraph({
           alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
-              text:
-                "HEAD OF THE DEPARTMENT                                      PRINCIPAL",
+              text: "HEAD OF THE DEPARTMENT                                      PRINCIPAL",
               font: "Times New Roman",
               size: 28,
               bold: true,
@@ -387,14 +357,8 @@ exports.generateReport = async (req, res) => {
     });
 
     const buffer = await Packer.toBuffer(doc);
-
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=Camp_Report.docx"
-    );
-
+    res.setHeader("Content-Disposition", "attachment; filename=Camp_Report.docx");
     res.send(buffer);
-
   } catch (err) {
     console.log(err);
     res.status(500).send("Error generating report");
